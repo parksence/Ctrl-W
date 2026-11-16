@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "font": "node scripts/subset-font.mjs",
+    "predev": "npm run font",
     "dev": "next dev",
+    "prebuild": "npm run font",
     "build": "next build",
-    "start": "next start",
+    "preview": "npx --yes serve out",
     "lint": "eslint"
   },
   "dependencies": {
@@ -20,7 +23,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "subset-font": "^2.9.0",
     "tailwindcss": "4.3.3",
     "typescript": "^5"
-  }
+  },
+  "description": "휘발: 쓰고, 날리고, 잊는 디지털 대나무숲"
 }

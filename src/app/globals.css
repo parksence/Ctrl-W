@@ -1,26 +1,1009 @@
 @import "tailwindcss";
 
+/*
+  색은 평소엔 먹색과 달빛 두 가지뿐입니다.
+  노랑 → 주황 → 분홍의 "열기" 색은 타이핑할 때만 화면에 올라옵니다.
+*/
+@theme {
+  --color-ink: #0a0f0d;
+  --color-grove: #131c17;
+  --color-stalk: #26352c;
+  --color-dusk: #4f6156;
+  --color-mist: #8a9a8e;
+  --color-moon: #eef2e6;
+  --color-sun: #ffd60a;
+  --color-ember: #ff7a1a;
+  --color-rage: #ff2d55;
+
+  --font-display: var(--font-bhs), "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard Variable", Pretendard, "Malgun Gothic",
+    "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --gut: clamp(18px, 6vw, 112px);
+  --heat: 0;
+  --hc: 238 242 230;
+  --g: 0;
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html,
+body {
+  background: var(--color-ink);
+  color: var(--color-moon);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:focus-visible {
+  outline: 2px solid var(--color-sun);
+  outline-offset: 2px;
+}
+
+/* ───────────────────────── 메인 화면 ───────────────────────── */
+
+.app {
+  position: fixed;
+  inset: var(--vvt, 0px) 0 auto 0;
+  height: var(--vvh, 100dvh);
+  overflow: hidden;
+  isolation: isolate;
+  overscroll-behavior: none;
+}
+
+/* 바닥에서 올라오는 열기 */
+.app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(85% 60% at 50% 112%, rgb(var(--hc) / calc(var(--heat) * 0.5)), transparent 72%),
+    radial-gradient(120% 90% at 50% 120%, rgb(var(--hc) / calc(var(--heat) * 0.22)), transparent 70%);
+}
+
+.app::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 45%, transparent 52%, rgb(var(--hc) / calc(var(--heat) * 0.26)) 100%);
+}
+
+.shell {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px var(--gut) 4px;
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-display);
+  font-size: 27px;
+  line-height: 1;
+  color: var(--color-moon);
+}
+
+.tally {
+  margin: 0 0 0 auto;
+  font-size: 13px;
+  color: var(--color-mist);
+  white-space: nowrap;
+}
+
+.tally b {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 19px;
+  color: var(--color-sun);
+  margin: 0 1px 0 3px;
+}
+
+.tools {
+  display: flex;
+  gap: 6px;
+}
+
+.chip {
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-mist);
+  background: transparent;
+  border: 1px solid var(--color-stalk);
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  color: var(--color-moon);
+  border-color: var(--color-mist);
+}
+
+.chip[aria-checked="true"] {
+  color: var(--color-ink);
+  background: var(--color-moon);
+  border-color: var(--color-moon);
+  font-weight: 700;
+}
+
+/* ── 글 쓰는 자리 */
+
+.stage {
+  position: relative;
+  min-height: 0;
+}
+
+.vent-text {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  padding: clamp(12px, 3vh, 34px) max(var(--gut), calc(100% - var(--gut) - 36em)) 24px var(--gut);
+  font-family: var(--font-sans);
+  font-size: clamp(19px, 1vw + 15px, 26px);
+  font-weight: 500;
+  line-height: 1.65;
+  letter-spacing: 0;
+  color: color-mix(in oklab, var(--color-moon), rgb(var(--hc)) calc(var(--heat) * 34%));
+  caret-color: rgb(var(--hc));
+  white-space: break-spaces;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  line-break: anywhere;
+  overflow-y: auto;
+  scrollbar-width: none;
+  opacity: calc(1 - var(--fade, 0) * 0.72);
+}
+
+.vent-text::-webkit-scrollbar {
+  display: none;
+}
+
+/* 빈 화면의 첫마디. 커서가 놓이는 첫 줄은 비워 둡니다. */
+.hello {
+  position: absolute;
+  inset: 0;
+  padding: calc(clamp(12px, 3vh, 34px) + clamp(19px, 1vw + 15px, 26px) * 1.65 + clamp(6px, 2vh, 22px)) var(--gut) 0;
+  pointer-events: none;
+}
+
+.hello h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(38px, 6.6vw, 104px);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+  color: var(--color-moon);
+}
+
+.hello h1 span {
+  display: block;
+  color: var(--color-dusk);
+}
+
+.hello p {
+  margin: clamp(14px, 3vh, 30px) 0 0;
+  max-width: 48em;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--color-mist);
+  word-break: keep-all;
+}
+
+/* ── 콤보 */
+
+.combo {
+  position: absolute;
+  right: var(--gut);
+  top: 6px;
+  text-align: right;
+  font-family: var(--font-display);
+  line-height: 1;
+  color: rgb(var(--hc));
+  opacity: 0;
+  transform: translateY(-8px);
+  transition:
+    opacity 0.3s,
+    transform 0.3s;
+  pointer-events: none;
+}
+
+.combo[data-on="1"] {
+  opacity: 1;
+  transform: none;
+  transition-duration: 0.08s;
+}
+
+.combo span {
+  display: inline-block;
+  font-size: clamp(52px, 8vw, 124px);
+  transform-origin: 100% 60%;
+  text-shadow: 0 0 calc(10px + var(--heat) * 40px) rgb(var(--hc) / 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.combo em {
+  font-style: normal;
+  font-size: clamp(16px, 1.7vw, 26px);
+  margin-left: 8px;
+  color: var(--color-moon);
+}
+
+.combo i {
+  display: block;
+  margin-top: 10px;
+  font-style: normal;
+  font-size: clamp(20px, 2.6vw, 40px);
+  color: var(--color-sun);
+  white-space: nowrap;
+  opacity: 0;
+  transform-origin: 100% 50%;
+  -webkit-text-stroke: 7px var(--color-ink);
+  paint-order: stroke fill;
+  text-shadow: 0.06em 0.07em 0 var(--color-rage);
+}
+
+/* ── 결과 스탬프: 예능 자막처럼 쾅 찍힙니다. */
+
+.stamp,
+.echo {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: clamp(8px, 1.6vh, 16px);
+  padding: 0 20px 4vh;
+  text-align: center;
+  pointer-events: none;
+  animation: bye 0.3s 2.4s both;
+}
+
+.stamp strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(46px, 11vw, 150px);
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-sun);
+  -webkit-text-stroke: clamp(8px, 1.5vw, 18px) var(--color-ink);
+  paint-order: stroke fill;
+  text-shadow: 0.055em 0.065em 0 var(--color-rage);
+  animation: slam 0.42s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.stamp em {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-size: clamp(20px, 3.2vw, 44px);
+  line-height: 1.1;
+  color: var(--color-moon);
+  -webkit-text-stroke: 7px var(--color-ink);
+  paint-order: stroke fill;
+  transform: rotate(-4deg);
+  animation: rise 0.3s 0.16s both;
+}
+
+.stamp small {
+  margin-top: clamp(8px, 2vh, 20px);
+  font-size: 14px;
+  color: var(--color-mist);
+  animation: rise 0.3s 0.3s both;
+}
+
+.echo {
+  animation: bye 0.5s 1.3s both;
+}
+
+.echo strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(22px, 3vw, 36px);
+  color: var(--color-dusk);
+  animation: rise 0.5s both;
+}
+
+@keyframes slam {
+  0% {
+    opacity: 0;
+    transform: rotate(-14deg) scale(3.4);
+  }
+  55% {
+    opacity: 1;
+    transform: rotate(-3deg) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-4deg) scale(1);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes bye {
+  to {
+    opacity: 0;
+    translate: 0 -16px;
+  }
+}
+
+/* ── 분노 게이지 */
+
+.gauge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 var(--gut);
+  height: 24px;
+}
+
+.gauge .rail {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-grove);
+}
+
+.gauge .fill {
+  height: 100%;
+  width: calc(var(--g) * 100%);
+  border-radius: 3px;
+  background-image: linear-gradient(90deg, var(--color-sun), var(--color-ember) 55%, var(--color-rage));
+  background-size: calc(100% / max(var(--g), 0.001)) 100%;
+  box-shadow: 0 0 calc(var(--g) * 18px) rgb(255 122 26 / 0.7);
+  transition: width 0.2s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+
+.gauge output {
+  min-width: 7.5em;
+  text-align: right;
+  font-size: 12px;
+  color: var(--color-mist);
+  font-variant-numeric: tabular-nums;
+}
+
+.app[data-full="1"] .gauge .fill {
+  animation: throb 0.45s ease-in-out infinite alternate;
+}
+
+.app[data-full="1"] .gauge output {
+  color: var(--color-sun);
+}
+
+@keyframes throb {
+  to {
+    box-shadow: 0 0 26px rgb(255 45 85 / 0.95);
+    filter: brightness(1.25);
+  }
+}
+
+/* ── 아래 조작부 */
+
+.dock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 8px var(--gut) 10px;
+}
+
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--color-grove);
+  border: 1px solid var(--color-stalk);
+}
+
+.seg button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-mist);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  padding: 9px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.seg button:hover {
+  color: var(--color-moon);
+}
+
+.seg button[aria-checked="true"] {
+  background: var(--color-moon);
+  color: var(--color-ink);
+}
+
+.hint {
+  flex: 1 1 180px;
+  min-width: 0;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--color-mist);
+}
+
+/* 눌리는 맛이 있는 큼직한 버튼. 게이지가 찰수록 달아오릅니다. */
+.fire {
+  --btn: color-mix(in oklab, var(--color-moon), var(--color-sun) calc(var(--g) * 100%));
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 23px;
+  line-height: 1;
+  color: var(--color-ink);
+  background: var(--btn);
+  border: 0;
+  border-radius: 14px;
+  padding: 14px 20px 13px 22px;
+  cursor: pointer;
+  box-shadow:
+    0 6px 0 color-mix(in oklab, var(--btn), #000 45%),
+    0 12px 26px rgb(0 0 0 / 0.5);
+  transition:
+    transform 0.06s,
+    box-shadow 0.06s;
+}
+
+.fire:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.fire:active:not(:disabled) {
+  transform: translateY(5px);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--btn), #000 45%),
+    0 3px 8px rgb(0 0 0 / 0.5);
+}
+
+.fire:disabled {
+  --btn: var(--color-grove);
+  color: var(--color-dusk);
+  cursor: default;
+}
+
+.fire kbd {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  border: 1.5px solid currentColor;
+  border-radius: 6px;
+  padding: 3px 6px;
+  opacity: 0.6;
+}
+
+.app[data-full="1"] .fire {
+  --btn: var(--color-ember);
+  background-image: linear-gradient(180deg, var(--color-sun), var(--color-ember) 60%, var(--color-rage) 130%);
+  animation: ready 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes ready {
+  to {
+    box-shadow:
+      0 6px 0 color-mix(in oklab, var(--btn), #000 45%),
+      0 0 34px rgb(255 122 26 / 0.85);
+  }
+}
+
+.vow {
+  margin: 0;
+  padding: 0 var(--gut) max(12px, env(safe-area-inset-bottom));
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-mist);
+}
+
+.vow a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+
+.vow a:hover {
+  color: var(--color-moon);
+}
+
+.fx {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  pointer-events: none;
+  z-index: 40;
+}
+
+@media (max-width: 720px) {
+  .tally .long {
+    display: none;
+  }
+
+  .combo {
+    top: auto;
+    bottom: 8px;
+  }
+
+  .combo i {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    margin: 0 0 8px;
+  }
+
+  .dock {
+    gap: 8px;
+    padding-top: 6px;
+  }
+
+  .seg {
+    flex: 1 1 auto;
+  }
+
+  .seg button {
+    flex: 1;
+    padding: 10px 6px;
+  }
+
+  .hint {
+    display: none;
+  }
+
+  .fire {
+    flex: 1 1 100%;
+    justify-content: center;
+    font-size: 21px;
+    padding: 13px 16px 12px;
+  }
+
+  .fire kbd {
+    display: none;
+  }
+}
+
+@media (max-height: 560px) {
+  .vow,
+  .hello p {
+    display: none;
+  }
+
+  .dock {
+    padding-bottom: 12px;
+  }
+}
+
+/* 휴대폰에서 키보드가 올라와 있는 동안에는 글 쓸 자리를 넓히려고 선택 버튼들을 접어 둡니다. */
+@media (max-height: 560px) and (max-width: 720px) {
+  .seg {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp strong,
+  .stamp em,
+  .stamp small,
+  .echo strong {
+    animation: none;
+  }
+
+  .stamp strong,
+  .stamp em {
+    transform: rotate(-4deg);
+  }
+
+  .app[data-full="1"] .fire,
+  .app[data-full="1"] .gauge .fill {
+    animation: none;
+  }
+}
+
+/* ───────────────────────── 위장 화면 ───────────────────────── */
+
+.dz {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+  background: #fff;
+  color: #1f2328;
+  color-scheme: light;
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", -apple-system, "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+
+.dz-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: #2f6f55;
+  color: #fff;
+}
+
+.dz-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background:
+    linear-gradient(#2f6f55, #2f6f55) 50% 50% / 100% 1.5px no-repeat,
+    linear-gradient(#2f6f55, #2f6f55) 50% 50% / 1.5px 100% no-repeat,
+    #fff;
+}
+
+.dz-file {
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: default;
+}
+
+.dz-saved {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.dz-menu {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px;
+  background: #f3f5f4;
+  border-bottom: 1px solid #dfe3e1;
+}
+
+.dz-menu span {
+  padding: 7px 12px;
+  color: #3b4248;
+}
+
+.dz-menu .on {
+  font-weight: 700;
+  color: #2f6f55;
+  box-shadow: inset 0 -2px 0 #2f6f55;
+}
+
+.dz-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #dfe3e1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.dz-tools .box {
+  border: 1px solid #c9cfcc;
+  border-radius: 3px;
+  padding: 3px 8px;
+  min-width: 34px;
+}
+
+.dz-tools .wide {
+  min-width: 110px;
+}
+
+.dz-tools .btn {
+  padding: 4px 8px;
+  border-radius: 3px;
+  color: #3b4248;
+}
+
+.dz-tools .b {
+  font-weight: 800;
+}
+
+.dz-tools .i {
+  font-style: italic;
+}
+
+.dz-tools .u {
+  text-decoration: underline;
+}
+
+.dz-tools .sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: #dfe3e1;
+}
+
+.dz-fx {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #dfe3e1;
+}
+
+.dz-fx .name {
+  width: 76px;
+  padding: 5px 10px;
+  border-right: 1px solid #dfe3e1;
+}
+
+.dz-fx .fx-mark {
+  padding: 5px 10px;
+  font-style: italic;
+  color: #7b858c;
+  border-right: 1px solid #dfe3e1;
+}
+
+.dz-fx .val {
+  padding: 5px 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dz-grid {
+  overflow: auto;
+  outline: 0;
+  background: #fff;
+}
+
+.dz-grid table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: max-content;
+}
+
+.dz-grid th,
+.dz-grid td {
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid #e3e6e4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 400;
+}
+
+.dz-grid th {
+  background: #f3f5f4;
+  color: #5b656c;
+  text-align: center;
+  font-size: 12px;
+}
+
+.dz-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.dz-grid tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.dz-grid th.on {
+  background: #dcebe4;
+  color: #1f4d3a;
+  font-weight: 700;
+}
+
+.dz-grid td {
+  position: relative;
+  cursor: cell;
+}
+
+.dz-grid td.sel {
+  outline: 2px solid #2f6f55;
+  outline-offset: -2px;
+  overflow: visible;
+}
+
+.dz-grid td.t {
+  font-size: 15px;
+  font-weight: 700;
+  overflow: visible;
+}
+
+.dz-grid td.m {
+  color: #6b757c;
+  overflow: visible;
+}
+
+.dz-grid td.h {
+  background: #e9f1ed;
+  font-weight: 700;
+  text-align: center;
+}
+
+.dz-grid td.n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dz-grid td.w {
+  color: #b42318;
+}
+
+.dz-grid td.s {
+  background: #f6f8f7;
+  font-weight: 700;
+  border-top: 1.5px solid #8a949b;
+}
+
+.dz-grid td input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  padding: 0 6px;
+  font: inherit;
+  background: #fff;
+  color: inherit;
+}
+
+.dz-foot {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 10px;
+  background: #f3f5f4;
+  border-top: 1px solid #dfe3e1;
+}
+
+.dz-foot .tab {
+  padding: 7px 14px;
+  color: #5b656c;
+}
+
+.dz-foot .tab.on {
+  background: #fff;
+  font-weight: 700;
+  color: #2f6f55;
+  box-shadow: inset 0 2px 0 #2f6f55;
+}
+
+.dz-foot .ready {
+  margin-left: auto;
+  font-size: 12px;
+  color: #7b858c;
+}
+
+/* ───────────────────────── 안내 페이지 ───────────────────────── */
+
+.doc {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: clamp(28px, 6vh, 72px) clamp(20px, 5vw, 40px) 96px;
+  line-height: 1.75;
+  word-break: keep-all;
+}
+
+.doc .back {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--color-moon);
+  text-decoration: none;
+}
+
+.doc h1 {
+  margin: clamp(28px, 6vh, 56px) 0 18px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(34px, 6vw, 60px);
+  line-height: 1.12;
+}
+
+.doc h2 {
+  margin: 52px 0 12px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(22px, 3vw, 28px);
+  line-height: 1.25;
+  color: var(--color-sun);
+}
+
+.doc p,
+.doc li {
+  font-size: 16px;
+  color: #c9d2c4;
+}
+
+.doc .lead {
+  font-size: 18px;
+  color: var(--color-moon);
+}
+
+.doc ul {
+  padding-left: 1.2em;
+  list-style: disc;
+}
+
+.doc li {
+  margin: 6px 0;
+}
+
+.doc strong {
+  color: var(--color-moon);
+}
+
+.doc a {
+  color: var(--color-moon);
+  text-underline-offset: 3px;
+}
+
+.doc code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--color-grove);
+  border: 1px solid var(--color-stalk);
+  white-space: nowrap;
+}
+
+.doc table {
+  width: 100%;
+  margin: 14px 0;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.doc th,
+.doc td {
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--color-stalk);
+  text-align: left;
+  vertical-align: top;
+  color: #c9d2c4;
+}
+
+.doc th {
+  font-weight: 600;
+  color: var(--color-mist);
+  font-size: 13px;
+}
+
+.doc td:first-child {
+  color: var(--color-moon);
+  font-weight: 600;
+  white-space: nowrap;
 }
