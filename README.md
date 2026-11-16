@@ -69,6 +69,8 @@ scripts/subset-font.mjs      제목 글꼴 서브셋 생성
 
 ## 배포 (Cloudflare)
 
+지금은 Cloudflare Workers 프로젝트 `ctrl-w`가 이 저장소의 `main` 브랜치에 연결되어 있어서, 푸시하면 자동으로 빌드·배포되고 https://ctrlw.hjparkk.com 에 반영됩니다.
+
 정적 사이트라 둘 중 어느 방식으로든 올릴 수 있습니다. 두 방식 모두 `public/_headers`를 그대로 적용합니다.
 
 **Workers**: Workers & Pages → Create → Import a repository
@@ -81,7 +83,7 @@ scripts/subset-font.mjs      제목 글꼴 서브셋 생성
 - Build command: `npm run build`
 - Build output directory: `out`
 
-배포 주소가 `https://hjparkk.com`이 아니면 `src/lib/site.ts`를 고치거나 빌드 환경 변수 `NEXT_PUBLIC_SITE_URL`을 넣으세요. 공유 미리보기(OG) 주소에 쓰입니다.
+배포 주소가 `https://ctrlw.hjparkk.com`이 아니면 `src/lib/site.ts`를 고치거나 빌드 환경 변수 `NEXT_PUBLIC_SITE_URL`을 넣으세요. 공유 미리보기(OG) 주소에 쓰입니다.
 
 ## 글꼴
 
