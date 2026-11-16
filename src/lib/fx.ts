@@ -12,7 +12,7 @@ export type Snap = {
   area: Box;
   box: Box;
 };
-export type Kind = "shred" | "burn" | "hole" | "vapor";
+export type Kind = "shred" | "burn" | "hole" | "blast" | "vapor";
 
 type Particle = {
   x: number;
@@ -43,6 +43,11 @@ export const MOON: RGB = [238, 242, 230];
 export const SUN: RGB = [255, 214, 10];
 export const EMBER: RGB = [255, 122, 26];
 export const RAGE: RGB = [255, 45, 85];
+export const CYAN: RGB = [64, 224, 255];
+export const VIOLET: RGB = [176, 108, 255];
+export const MINT: RGB = [61, 245, 184];
+/** 터질 때 쓰는 알록달록한 색 묶음 */
+export const PARTY: RGB[] = [SUN, EMBER, RAGE, CYAN, VIOLET, MINT, MOON];
 const ASH: RGB = [92, 104, 96];
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -63,6 +68,8 @@ export class Fx {
   heat = 0;
   heatTarget = 0;
   trauma = 0;
+  /** 폭주 모드: 불꽃이 두 배로, 알록달록하게 튑니다. */
+  fever = false;
   reduced = false;
   displayFont = "sans-serif";
   onFrame: ((heat: number, dx: number, dy: number) => void) | null = null;
@@ -127,7 +134,8 @@ export class Fx {
     if (this.reduced) return;
     const heat = this.heat;
     const color = heatRGB(Math.max(heat, 0.18));
-    const n = hot ? 30 : 2 + Math.floor(heat * 6);
+    const fever = this.fever;
+    const n = hot ? 44 : (3 + Math.floor(heat * 8)) * (fever ? 2 : 1);
     for (let i = 0; i < n; i++) {
       const a = hot ? rnd(0, TAU) : rnd(-Math.PI * 0.92, -Math.PI * 0.08);
       const sp = rnd(70, 190 + heat * 340) * (hot ? 1.7 : 1);
@@ -140,14 +148,15 @@ export class Fx {
         drag: 2.4,
         life: rnd(0.22, 0.5) * (hot ? 1.4 : 1),
         size: rnd(1.6, 3 + heat * 2.2),
-        c: hot ? pick([RAGE, SUN, MOON]) : i % 3 === 0 ? MOON : color,
+        c: hot || fever ? pick(PARTY) : i % 3 === 0 ? MOON : color,
         kind: i % 2 ? 1 : 0,
         add: true,
       });
     }
     if (hot) {
-      this.ring(x, y, RAGE, 520, 0.42, 3);
-      this.word("크리티컬!", x, y - 26, SUN);
+      this.ring(x, y, RAGE, 560, 0.42, 4);
+      this.ring(x, y, CYAN, 340, 0.5, 2);
+      this.word("크리티컬!", x, y - 30, SUN, 30);
     }
     this.kick();
   }
@@ -168,13 +177,64 @@ export class Fx {
         drag: 2.6,
         life: rnd(0.35, 0.8),
         size: rnd(2, 4.5),
-        c: pick([SUN, EMBER, RAGE, MOON]),
+        c: pick(PARTY),
         kind: i % 3 === 0 ? 2 : 1,
         add: i % 3 !== 0,
         vr: rnd(-12, 12),
       });
     }
     this.ring(x, y, SUN, 460, 0.4, 2.5);
+    this.kick();
+  }
+
+  /** 화면에 떠오르는 짧은 글자 (점수, 추임새). */
+  say(txt: string, x: number, y: number, c: RGB = SUN, size = 24) {
+    if (this.reduced) return;
+    this.word(txt, x, y, c, size);
+    this.kick();
+  }
+
+  /** 피날레: 위에서는 색종이 비가 내리고, 양쪽 아래에서는 축포가 터집니다. */
+  party(power = 1) {
+    if (this.reduced) return;
+    const n = Math.round(60 + power * 120);
+    for (let i = 0; i < n; i++) {
+      this.add({
+        x: rnd(0, this.w),
+        y: rnd(-60, -6),
+        vx: rnd(-70, 70),
+        vy: rnd(120, 420),
+        g: 520,
+        drag: 0.9,
+        life: rnd(1.1, 2.1),
+        size: rnd(4, 9),
+        c: pick(PARTY),
+        kind: 2,
+        rot: rnd(0, TAU),
+        vr: rnd(-12, 12),
+      });
+    }
+    for (const side of [0, 1]) {
+      const x = side ? this.w - 8 : 8;
+      for (let i = 0; i < n / 2; i++) {
+        const a = side ? rnd(-2.6, -1.75) : rnd(-1.4, -0.55);
+        const sp = rnd(700, 1500) * (0.7 + power * 0.3);
+        this.add({
+          x,
+          y: this.h - 6,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp,
+          g: 1500,
+          drag: 1.5,
+          life: rnd(0.9, 1.8),
+          size: rnd(4, 9),
+          c: pick(PARTY),
+          kind: 2,
+          rot: rnd(0, TAU),
+          vr: rnd(-14, 14),
+        });
+      }
+    }
     this.kick();
   }
 
@@ -194,6 +254,7 @@ export class Fx {
     if (kind === "shred") made = this.sceneShred(snap, power, onClimax);
     else if (kind === "burn") made = this.sceneBurn(snap, power, onClimax);
     else if (kind === "hole") made = this.sceneHole(snap, power, onClimax);
+    else if (kind === "blast") made = this.sceneBlast(snap, power, onClimax);
     else made = this.sceneVapor(snap, onClimax);
 
     this.scene = made.scene;
@@ -292,8 +353,8 @@ export class Fx {
     this.rings.push({ x, y, r: 6, vr: speed, life, max: life, c, w });
   }
 
-  private word(txt: string, x: number, y: number, c: RGB) {
-    this.add({ x, y, vy: -90, drag: 2, life: 0.75, size: 20, c, kind: 4, rot: rnd(-0.12, 0.12), txt });
+  private word(txt: string, x: number, y: number, c: RGB, size = 20) {
+    this.add({ x, y, vy: -120, drag: 2, life: 0.85, size, c, kind: 4, rot: rnd(-0.14, 0.14), txt });
   }
 
   private sprite(c: RGB): HTMLCanvasElement {
@@ -437,7 +498,7 @@ export class Fx {
         drag: 1.4,
         life: rnd(0.7, 1.5),
         size: rnd(4, 9),
-        c: pick([MOON, MOON, SUN, EMBER, RAGE]),
+        c: pick(PARTY),
         kind: 2,
         rot: rnd(0, TAU),
         vr: rnd(-14, 14),
@@ -859,6 +920,129 @@ export class Fx {
       return t > end + COLLAPSE + 0.3;
     };
     return { scene, duration: end + COLLAPSE };
+  }
+
+  // ── 폭파: 잠깐 움츠렸다가 터져서, 글자가 사방으로 튀고 바닥에 구릅니다.
+  private sceneBlast(snap: Snap, power: number, onClimax: () => void) {
+    const ctx = this.ctx;
+    const cx = (snap.box.l + snap.box.r) / 2;
+    const cy = (snap.box.t + snap.box.b) / 2 + 10;
+    const floor = this.h - 10;
+    const CHARGE = 0.22;
+    const items = snap.glyphs.map((q) => {
+      const x = q.x + q.w / 2;
+      const y = q.y + q.h / 2;
+      const dx = x - cx;
+      const dy = y - cy;
+      const d = Math.hypot(dx, dy) + 1;
+      const sp = rnd(0.55, 1.25) * Math.min(2000, 760 + 70000 / (d + 50)) * (0.8 + power * 0.4);
+      return {
+        q,
+        x,
+        y,
+        ox: x,
+        oy: y,
+        vx: (dx / d) * sp + rnd(-160, 160),
+        vy: (dy / d) * sp - rnd(260, 780),
+        rot: 0,
+        vr: rnd(-15, 15),
+        c: pick(PARTY),
+        bounces: 0,
+      };
+    });
+    let fired = false;
+    let climaxed = false;
+
+    const scene: Scene = (rawT, dt) => {
+      const t = Math.max(0, rawT);
+      ctx.font = snap.font;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+
+      // 움츠리기: 글자가 가운데로 쏠리며 떨립니다.
+      if (t < CHARGE) {
+        const k = t / CHARGE;
+        this.trauma = Math.max(this.trauma, 0.2 + k * 0.35);
+        ctx.fillStyle = k > 0.6 ? "#fff" : snap.color;
+        for (const it of items) {
+          ctx.fillText(
+            it.q.ch,
+            lerp(it.ox, cx, 0.08 * k) + rnd(-2.5, 2.5) * k,
+            lerp(it.oy, cy, 0.08 * k) + rnd(-2.5, 2.5) * k,
+          );
+        }
+        ctx.textAlign = "left";
+        return false;
+      }
+
+      if (!fired) {
+        fired = true;
+        this.flash = Math.max(this.flash, 0.3);
+        this.trauma = 1;
+        this.ring(cx, cy, MOON, 1700, 0.5, 7);
+        this.ring(cx, cy, SUN, 1100, 0.65, 5);
+        this.ring(cx, cy, RAGE, 700, 0.8, 4);
+        this.ring(cx, cy, CYAN, 420, 0.9, 3);
+        const n = Math.round(90 + power * 170);
+        for (let i = 0; i < n; i++) {
+          const a = rnd(0, TAU);
+          const sp = rnd(200, 1300);
+          this.add({
+            x: cx,
+            y: cy,
+            vx: Math.cos(a) * sp,
+            vy: Math.sin(a) * sp,
+            g: 500,
+            drag: 2.4,
+            life: rnd(0.4, 1.2),
+            size: rnd(1.8, 4.5),
+            c: pick(PARTY),
+            kind: i % 4 === 0 ? 2 : 1,
+            add: i % 4 !== 0,
+            vr: rnd(-12, 12),
+          });
+        }
+      }
+
+      const tt = t - CHARGE;
+      const fade = tt > 1.3 ? clamp(1 - (tt - 1.3) / 0.7) : 1;
+      ctx.globalAlpha = fade;
+      for (const it of items) {
+        it.vy += 2300 * dt;
+        it.vx *= 1 - 0.5 * dt;
+        it.x += it.vx * dt;
+        it.y += it.vy * dt;
+        it.rot += it.vr * dt;
+        if (it.y > floor) {
+          it.y = floor;
+          if (Math.abs(it.vy) > 200 && it.bounces++ < 2) {
+            this.add({ x: it.x, y: floor, vx: rnd(-80, 80), vy: rnd(-260, -80), g: 900, drag: 2, life: 0.3, size: 2.4, c: it.c, kind: 1, add: true });
+          }
+          it.vy *= -0.46;
+          it.vx *= 0.72;
+          it.vr *= 0.6;
+        }
+        if (it.x < 6 || it.x > this.w - 6) {
+          it.x = clamp(it.x, 6, this.w - 6);
+          it.vx *= -0.6;
+        }
+        ctx.fillStyle = tt < 0.1 ? "#fff" : css(tt < 1 ? it.c : mix(it.c, MOON, clamp((tt - 1) / 0.3)));
+        ctx.save();
+        ctx.translate(it.x, it.y);
+        ctx.rotate(it.rot);
+        ctx.fillText(it.q.ch, 0, 0);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+      ctx.textAlign = "left";
+
+      if (!climaxed && tt > 0.85) {
+        climaxed = true;
+        onClimax();
+      }
+      return tt > 2.0;
+    };
+    return { scene, duration: CHARGE };
   }
 
   // ── 증발: 타이머가 다 되면 조용히 김처럼 흩어집니다.

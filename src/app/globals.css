@@ -14,6 +14,9 @@
   --color-sun: #ffd60a;
   --color-ember: #ff7a1a;
   --color-rage: #ff2d55;
+  --color-cyan: #40e0ff;
+  --color-violet: #b06cff;
+  --color-mint: #3df5b8;
 
   --font-display: var(--font-bhs), "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --font-sans:
@@ -147,6 +150,7 @@ body {
 .stage {
   position: relative;
   min-height: 0;
+  container-type: size;
 }
 
 .vent-text {
@@ -199,9 +203,23 @@ body {
   color: var(--color-moon);
 }
 
+/* 둘째 줄은 식지 않은 불씨처럼 천천히 일렁입니다. */
 .hello h1 span {
   display: block;
-  color: var(--color-dusk);
+  color: var(--color-ember);
+  background: linear-gradient(
+      100deg,
+      var(--color-sun),
+      var(--color-ember) 30%,
+      var(--color-rage) 55%,
+      var(--color-violet) 75%,
+      var(--color-sun)
+    )
+    0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: smolder 9s linear infinite;
 }
 
 .hello p {
@@ -279,7 +297,7 @@ body {
   padding: 0 20px 4vh;
   text-align: center;
   pointer-events: none;
-  animation: bye 0.3s 2.4s both;
+  animation: bye 0.3s 3.4s both;
 }
 
 .stamp strong {
@@ -1006,4 +1024,241 @@ body {
   color: var(--color-moon);
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* ───────────────────────── 타격감 강화 ───────────────────────── */
+
+@property --spin {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes orbit {
+  to {
+    --spin: 360deg;
+  }
+}
+
+@keyframes smolder {
+  to {
+    background-position: -300% 0;
+  }
+}
+
+@keyframes fever-ink {
+  0%,
+  100% {
+    color: var(--color-sun);
+  }
+  20% {
+    color: var(--color-ember);
+  }
+  40% {
+    color: var(--color-rage);
+  }
+  60% {
+    color: var(--color-violet);
+  }
+  80% {
+    color: var(--color-cyan);
+  }
+}
+
+/* 바닥에서 솟는 대숲 이퀄라이저 */
+.grove {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* 열기가 오르면 글자에서 빛이 번집니다. */
+.vent-text {
+  text-shadow: 0 0 calc(var(--heat) * 22px) rgb(var(--hc) / calc(var(--heat) * 0.7));
+}
+
+/* 점수 배율 딱지 */
+.combo u {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 4px 9px 3px;
+  border-radius: 9px;
+  background: rgb(var(--hc));
+  color: var(--color-ink);
+  font-size: clamp(15px, 1.6vw, 24px);
+  text-decoration: none;
+  vertical-align: 0.5em;
+  rotate: 4deg;
+}
+
+.combo u:empty {
+  display: none;
+}
+
+.gauge output b {
+  margin-right: 10px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 17px;
+  color: rgb(var(--hc));
+}
+
+/* 글이 장전되면 버튼이 달아오릅니다. */
+.fire:not(:disabled) {
+  box-shadow:
+    0 6px 0 color-mix(in oklab, var(--btn), #000 45%),
+    0 12px 26px rgb(0 0 0 / 0.5),
+    0 0 calc(10px + var(--heat) * 46px) rgb(var(--hc) / calc(0.25 + var(--heat) * 0.6));
+}
+
+/* ── 폭주 모드: 콤보 50부터. 화면 가장자리가 무지개로 돌고 글자색이 계속 바뀝니다. */
+.app[data-fever="1"]::after {
+  background: conic-gradient(
+    from var(--spin) at 50% 50%,
+    var(--color-rage),
+    var(--color-sun),
+    var(--color-mint),
+    var(--color-cyan),
+    var(--color-violet),
+    var(--color-rage)
+  );
+  -webkit-mask-image: radial-gradient(ellipse at 50% 46%, transparent 46%, #000 100%);
+  mask-image: radial-gradient(ellipse at 50% 46%, transparent 46%, #000 100%);
+  opacity: 0.6;
+  animation: orbit 2.2s linear infinite;
+}
+
+.app[data-fever="1"] .vent-text {
+  animation: fever-ink 1.4s linear infinite;
+  text-shadow: 0 0 20px currentColor;
+}
+
+.app[data-fever="1"] .combo span,
+.app[data-fever="1"] .gauge output b {
+  animation: fever-ink 0.9s linear infinite;
+}
+
+.app[data-fever="1"] .combo u {
+  background: var(--color-moon);
+}
+
+.app[data-fever="1"] .fire:not(:disabled) {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-sun),
+    var(--color-ember),
+    var(--color-rage),
+    var(--color-violet),
+    var(--color-cyan),
+    var(--color-sun)
+  );
+  background-size: 300% 100%;
+  animation: smolder 1.6s linear infinite;
+}
+
+/* ── 랭크 도장 */
+.stamp {
+  gap: clamp(4px, 1.4cqh, 14px);
+}
+
+.stamp b {
+  --rank: var(--color-moon);
+  --rank-shadow: var(--color-rage);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(64px, min(24cqw, 36cqh), 280px);
+  line-height: 0.92;
+  color: var(--rank);
+  -webkit-text-stroke: clamp(8px, 1.6vw, 20px) var(--color-ink);
+  paint-order: stroke fill;
+  text-shadow: 0.05em 0.06em 0 var(--rank-shadow);
+  animation: slam 0.42s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.stamp[data-rank="D"] b {
+  --rank: var(--color-mist);
+  --rank-shadow: var(--color-stalk);
+}
+
+.stamp[data-rank="B"] b {
+  --rank: var(--color-cyan);
+  --rank-shadow: var(--color-violet);
+}
+
+.stamp[data-rank="A"] b {
+  --rank: var(--color-mint);
+  --rank-shadow: var(--color-cyan);
+}
+
+.stamp[data-rank="S"] b {
+  --rank: var(--color-sun);
+}
+
+.stamp[data-rank="SS"] b {
+  --rank: var(--color-rage);
+  --rank-shadow: var(--color-sun);
+  animation:
+    slam 0.42s cubic-bezier(0.2, 1.4, 0.4, 1) both,
+    fever-ink 0.8s 0.42s linear infinite;
+}
+
+.stamp[data-rank] strong {
+  font-size: clamp(26px, min(8cqw, 15cqh), 92px);
+  -webkit-text-stroke-width: clamp(6px, 1vw, 12px);
+  animation-delay: 0.14s;
+}
+
+.stamp p {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: var(--font-display);
+  font-size: clamp(22px, min(5.4cqw, 10cqh), 64px);
+  line-height: 1;
+  color: var(--color-moon);
+  font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 7px var(--color-ink);
+  paint-order: stroke fill;
+  animation: rise 0.3s 0.22s both;
+}
+
+.stamp mark {
+  padding: 5px 11px 4px;
+  border-radius: 9px;
+  background: var(--color-rage);
+  color: #fff;
+  margin-left: 10px;
+  font-size: 0.5em;
+  -webkit-text-stroke: 0;
+  rotate: -6deg;
+  align-self: center;
+  animation: throb 0.3s ease-in-out infinite alternate;
+}
+
+.stamp[data-rank] em {
+  font-size: clamp(16px, min(3.4cqw, 7cqh), 34px);
+  animation-delay: 0.3s;
+}
+
+.stamp[data-rank] small {
+  margin-top: clamp(2px, 1cqh, 12px);
+  animation-delay: 0.4s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hello h1 span,
+  .stamp b,
+  .stamp p,
+  .stamp mark,
+  .app[data-fever="1"]::after,
+  .app[data-fever="1"] .vent-text,
+  .app[data-fever="1"] .combo span,
+  .app[data-fever="1"] .gauge output b,
+  .app[data-fever="1"] .fire:not(:disabled) {
+    animation: none;
+  }
 }

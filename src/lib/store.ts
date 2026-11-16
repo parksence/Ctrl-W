@@ -2,16 +2,17 @@
 // 예외는 "탭 닫으면 증발" 모드 하나로, 그때만 sessionStorage에 임시로 둡니다.
 
 export type Mode = "now" | "timer" | "tab";
-export type Effect = "shred" | "burn" | "hole";
+export type Effect = "shred" | "burn" | "hole" | "blast";
 export type Prefs = { mode: Mode; sec: 10 | 30 | 60; effect: Effect; sound: boolean };
-export type Tally = { day: string; count: number; chars: number; best: number; total: number };
+/** top: 지금까지의 최고 점수. 날짜가 바뀌어도 남습니다. */
+export type Tally = { day: string; count: number; chars: number; best: number; total: number; top: number };
 
 const PREFS_KEY = "hwibal:prefs";
 const TALLY_KEY = "hwibal:tally";
 const DRAFT_KEY = "hwibal:draft";
 
 const DEFAULT_PREFS: Prefs = { mode: "now", sec: 10, effect: "shred", sound: false };
-const EMPTY_TALLY: Tally = { day: "", count: 0, chars: 0, best: 0, total: 0 };
+const EMPTY_TALLY: Tally = { day: "", count: 0, chars: 0, best: 0, total: 0, top: 0 };
 
 const today = () => {
   const d = new Date();
@@ -58,7 +59,7 @@ export const prefsStore = createStore<Prefs>(PREFS_KEY, DEFAULT_PREFS, (raw) => 
   return {
     mode: (["now", "timer", "tab"] as const).find((m) => m === r.mode) ?? DEFAULT_PREFS.mode,
     sec: ([10, 30, 60] as const).find((s) => s === r.sec) ?? DEFAULT_PREFS.sec,
-    effect: (["shred", "burn", "hole"] as const).find((e) => e === r.effect) ?? DEFAULT_PREFS.effect,
+    effect: (["shred", "burn", "hole", "blast"] as const).find((e) => e === r.effect) ?? DEFAULT_PREFS.effect,
     sound: r.sound === true,
   };
 });
@@ -68,29 +69,33 @@ export const tallyStore = createStore<Tally>(TALLY_KEY, EMPTY_TALLY, (raw) => {
   const r = (raw as Loose) ?? {};
   const day = today();
   const total = Number(r.total) || 0;
-  if (r.day !== day) return { ...EMPTY_TALLY, day, total };
+  const top = Number(r.top) || 0;
+  if (r.day !== day) return { ...EMPTY_TALLY, day, total, top };
   return {
     day,
     count: Number(r.count) || 0,
     chars: Number(r.chars) || 0,
     best: Number(r.best) || 0,
     total,
+    top,
   };
 });
 
-export function bumpTally(chars: number, combo: number): Tally {
+export function bumpTally(chars: number, combo: number, score = 0): Tally & { record: boolean } {
   const t = tallyStore.get();
   const day = today();
-  const base = t.day === day ? t : { ...EMPTY_TALLY, day, total: t.total };
+  const base = t.day === day ? t : { ...EMPTY_TALLY, day, total: t.total, top: t.top };
+  const record = score > base.top && base.top > 0;
   const next: Tally = {
     day,
     count: base.count + 1,
     chars: base.chars + chars,
     best: Math.max(base.best, combo),
     total: base.total + 1,
+    top: Math.max(base.top, score),
   };
   tallyStore.set(next);
-  return next;
+  return { ...next, record };
 }
 
 /**

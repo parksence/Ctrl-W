@@ -212,4 +212,39 @@ export class Sfx {
       this.tone("sine", notes[i] * 2, notes[i] * 2, at, 0.2, 0.06);
     }
   }
+
+  /** 폭파: 숨을 들이켰다가 터집니다. */
+  blast(charge: number, power: number) {
+    const ac = this.ensure();
+    if (!ac) return;
+    const t = ac.currentTime;
+    this.hiss(t, charge, 0.3, "bandpass", 500, 5200, 4);
+    this.tone("sawtooth", 90, 360, t, charge, 0.12, charge * 0.8);
+    const b = t + charge;
+    this.tone("sine", 140, 26, b, 0.7, 1);
+    this.hiss(b, 0.55, 0.7 + power * 0.2, "lowpass", 3200, 120);
+    this.hiss(b + 0.04, 0.9, 0.25, "highpass", 1800, 600);
+  }
+
+  /** 폭주 모드 진입: 위로 치닫는 팡파르. */
+  fever() {
+    const ac = this.ensure();
+    if (!ac) return;
+    const t = ac.currentTime;
+    [392, 523, 659, 784, 1047, 1319].forEach((f, i) => this.tone("square", f, f, t + i * 0.05, 0.16, 0.06));
+    this.tone("sine", 80, 160, t, 0.4, 0.5);
+    this.hiss(t, 0.5, 0.2, "highpass", 2000, 8000);
+  }
+
+  /** 랭크 도장. 등급이 높을수록 음이 더 올라갑니다. */
+  rank(level: number) {
+    const ac = this.ensure();
+    if (!ac) return;
+    const t = ac.currentTime;
+    this.tone("sine", 120, 40, t, 0.22, 0.9);
+    this.hiss(t, 0.08, 0.4, "bandpass", 1600, 800);
+    [523, 659, 784, 1047, 1319, 1568, 2093]
+      .slice(0, 2 + level)
+      .forEach((f, i) => this.tone("triangle", f, f, t + 0.06 + i * 0.06, 0.3, 0.09));
+  }
 }

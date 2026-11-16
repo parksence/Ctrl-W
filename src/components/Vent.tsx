@@ -9,7 +9,8 @@ import {
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { Fx, heatRGB, type Kind } from "@/lib/fx";
+import { CYAN, Fx, heatRGB, type Kind } from "@/lib/fx";
+import { Grove } from "@/lib/grove";
 import { hotAt } from "@/lib/hot";
 import { caretPoint, snapshot } from "@/lib/measure";
 import { Sfx } from "@/lib/sfx";
@@ -39,6 +40,7 @@ const EFFECTS: { id: Effect; label: string; verb: string }[] = [
   { id: "shred", label: "파쇄", verb: "파쇄" },
   { id: "burn", label: "소각", verb: "소각" },
   { id: "hole", label: "블랙홀", verb: "소멸" },
+  { id: "blast", label: "폭파", verb: "폭파" },
 ];
 // 콤보가 이 숫자에 닿으면 자막이 터집니다.
 const TIERS: [number, string][] = [
@@ -48,18 +50,31 @@ const TIERS: [number, string][] = [
   [300, "분노의 타건"],
   [500, "전설의 타건"],
 ];
-// 날린 글자 수에 따른 한마디.
-const VERDICTS: [number, string][] = [
-  [20, "가볍게 한 방"],
-  [80, "속이 좀 풀린다"],
-  [200, "묵은 체증이 내려간다"],
-  [500, "제대로 터졌다"],
-  [Infinity, "오늘의 역대급"],
+// 점수에 따른 랭크와 한마디. 점수는 타자 한 번에 10점 × 배율, 크리티컬은 300점 × 배율입니다.
+const RANKS: { id: string; min: number; say: string }[] = [
+  { id: "D", min: 0, say: "몸풀기" },
+  { id: "C", min: 500, say: "가볍게 한 방" },
+  { id: "B", min: 2500, say: "속이 좀 풀린다" },
+  { id: "A", min: 8000, say: "묵은 체증이 내려간다" },
+  { id: "S", min: 25000, say: "제대로 터졌다" },
+  { id: "SS", min: 70000, say: "오늘의 역대급" },
 ];
+const CRIT_BONUS = 300;
+// 콤보가 여기에 닿으면 폭주 모드: 화면이 무지개로 돌고 점수가 2배가 됩니다.
+const FEVER_AT = 50;
 // 이만큼 쓰면 게이지가 꽉 찹니다.
 const FULL = 300;
 
-type Stamp = { id: number; quiet: boolean; main: string; sub: string; foot: string };
+type Stamp = {
+  id: number;
+  quiet: boolean;
+  main: string;
+  sub: string;
+  foot: string;
+  rank?: string;
+  score?: number;
+  record?: boolean;
+};
 
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const countChars = (s: string) => s.replace(/\s/g, "").length;
@@ -82,6 +97,25 @@ const subscribeTouch = (cb: () => void) => {
   return () => mq.removeEventListener("change", cb);
 };
 
+/** 0에서 목표 숫자까지 빠르게 올라가는 숫자. */
+function CountUp({ to }: { to: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const t0 = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / 750);
+      el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))).toLocaleString("ko-KR");
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [to]);
+  return <span ref={ref}>0</span>;
+}
+
 export default function Vent() {
   const prefs = useSyncExternalStore(prefsStore.subscribe, prefsStore.get, prefsStore.getServer);
   const tally = useSyncExternalStore(tallyStore.subscribe, tallyStore.get, tallyStore.getServer);
@@ -98,19 +132,26 @@ export default function Vent() {
   const [left, setLeft] = useState(0);
   const [busy, setBusy] = useState(false);
   const [stamp, setStamp] = useState<Stamp | null>(null);
+  const [score, setScore] = useState(0);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const cvRef = useRef<HTMLCanvasElement>(null);
+  const groveRef = useRef<HTMLCanvasElement>(null);
+  const multRef = useRef<HTMLElement>(null);
   const comboRef = useRef<HTMLDivElement>(null);
   const comboNumRef = useRef<HTMLSpanElement>(null);
   const calloutRef = useRef<HTMLElement>(null);
   const fx = useRef<Fx | null>(null);
   const sfx = useRef<Sfx | null>(null);
+  const grove = useRef<Grove | null>(null);
   const live = useRef({
     combo: 0,
     peak: 0,
+    score: 0,
+    crits: 0,
+    fever: false,
     hits: [] as number[],
     hot: -1,
     lastInput: 0,
@@ -129,12 +170,15 @@ export default function Vent() {
     const engine = new Fx(cvRef.current!);
     fx.current = engine;
     sfx.current = new Sfx();
+    const bars = new Grove(groveRef.current!);
+    grove.current = bars;
     engine.displayFont =
       getComputedStyle(document.documentElement).getPropertyValue("--font-bhs").trim() || "sans-serif";
 
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const syncMotion = () => {
       engine.reduced = motion.matches;
+      bars.reduced = motion.matches;
     };
     syncMotion();
     motion.addEventListener("change", syncMotion);
@@ -142,6 +186,7 @@ export default function Vent() {
     let shown = -1;
     engine.onFrame = (heat, dx, dy) => {
       shell.style.transform = dx || dy ? `translate3d(${dx}px,${dy}px,0)` : "";
+      bars.heat = heat;
       if (heat === shown) return;
       shown = heat;
       const c = heatRGB(heat);
@@ -149,7 +194,10 @@ export default function Vent() {
       root.style.setProperty("--hc", `${c[0] | 0} ${c[1] | 0} ${c[2] | 0}`);
     };
 
-    const onResize = () => engine.resize();
+    const onResize = () => {
+      engine.resize();
+      bars.resize();
+    };
     window.addEventListener("resize", onResize);
 
     // 모바일에서 키보드가 올라와도 버튼이 가려지지 않도록 보이는 영역 높이에 맞춥니다.
@@ -158,6 +206,7 @@ export default function Vent() {
       if (!vv || vv.scale !== 1) return;
       root.style.setProperty("--vvh", `${vv.height}px`);
       root.style.setProperty("--vvt", `${vv.offsetTop}px`);
+      bars.resize();
     };
     syncViewport();
     vv?.addEventListener("resize", syncViewport);
@@ -169,6 +218,7 @@ export default function Vent() {
       vv?.removeEventListener("resize", syncViewport);
       vv?.removeEventListener("scroll", syncViewport);
       engine.dispose();
+      bars.dispose();
       sfx.current?.stop();
     };
   }, []);
@@ -200,6 +250,7 @@ export default function Vent() {
   const onDisguise = useEffectEvent((on: boolean) => {
     if (on) {
       fx.current?.clear();
+      grove.current?.clear();
       sfx.current?.stop();
       endCombo();
     } else {
@@ -234,6 +285,58 @@ export default function Vent() {
     L.combo = 0;
     L.hits.length = 0;
     if (comboRef.current) comboRef.current.dataset.on = "";
+    if (L.fever) {
+      L.fever = false;
+      delete rootRef.current?.dataset.fever;
+      if (fx.current) fx.current.fever = false;
+      if (grove.current) grove.current.fever = false;
+    }
+  }
+
+  /** 지금 점수 배율: 콤보 25마다 한 단계, 폭주 중에는 두 배. */
+  function mult() {
+    const L = live.current;
+    return Math.min(8, 1 + Math.floor(L.combo / 25)) * (L.fever ? 2 : 1);
+  }
+
+  function callout(text: string, ms = 1500) {
+    const el = calloutRef.current;
+    if (!el) return;
+    el.textContent = text;
+    el.animate(
+      [
+        { opacity: 0, transform: "scale(2.4) rotate(-9deg)" },
+        { opacity: 1, transform: "scale(1) rotate(-4deg)", offset: 0.2 },
+        { opacity: 1, transform: "scale(1) rotate(-4deg)", offset: 0.82 },
+        { opacity: 0, transform: "scale(.92) rotate(-4deg) translateY(-10px)" },
+      ],
+      { duration: ms, easing: "cubic-bezier(.2,1.2,.4,1)" },
+    );
+  }
+
+  function startFever() {
+    const L = live.current;
+    const engine = fx.current;
+    const num = comboNumRef.current;
+    if (!engine || L.fever) return;
+    L.fever = true;
+    if (rootRef.current) rootRef.current.dataset.fever = "1";
+    engine.fever = true;
+    if (grove.current) {
+      grove.current.fever = true;
+      grove.current.flare();
+    }
+    if (!engine.reduced) {
+      callout("폭주 모드! 점수 2배", 1900);
+      if (num) {
+        const r = num.getBoundingClientRect();
+        engine.burst(r.left + r.width / 2, r.top + r.height / 2, 1.4);
+      }
+      engine.party(0.35);
+      engine.trauma = Math.min(1, engine.trauma + 0.55);
+    }
+    sfx.current?.fever();
+    navigator.vibrate?.([20, 30, 20, 30, 60]);
   }
 
   function showCombo() {
@@ -244,6 +347,8 @@ export default function Vent() {
     if (!box || !num || !engine || L.combo < 5) return;
     box.dataset.on = "1";
     num.textContent = String(L.combo);
+    const m = mult();
+    if (multRef.current) multRef.current.textContent = m > 1 ? `×${m}` : "";
     if (engine.reduced) return;
     num.animate([{ transform: "scale(1.34)" }, { transform: "scale(1)" }], {
       duration: 150,
@@ -251,19 +356,8 @@ export default function Vent() {
     });
     const tier = TIERS.findIndex(([n]) => n === L.combo);
     if (tier < 0) return;
-    const callout = calloutRef.current;
-    if (callout) {
-      callout.textContent = TIERS[tier][1];
-      callout.animate(
-        [
-          { opacity: 0, transform: "scale(2.4) rotate(-9deg)" },
-          { opacity: 1, transform: "scale(1) rotate(-4deg)", offset: 0.2 },
-          { opacity: 1, transform: "scale(1) rotate(-4deg)", offset: 0.82 },
-          { opacity: 0, transform: "scale(.92) rotate(-4deg) translateY(-10px)" },
-        ],
-        { duration: 1500, easing: "cubic-bezier(.2,1.2,.4,1)" },
-      );
-    }
+    callout(TIERS[tier][1]);
+    grove.current?.flare(0.8);
     const r = num.getBoundingClientRect();
     engine.burst(r.left + r.width / 2, r.top + r.height / 2, tier / 4);
     engine.trauma = Math.min(1, engine.trauma + 0.3);
@@ -288,16 +382,43 @@ export default function Vent() {
     const at = hotAt(ta.value, ta.selectionEnd);
     const hot = at >= 0 && at !== L.hot;
     L.hot = at;
+    if (!L.fever && L.combo >= FEVER_AT) startFever();
+
+    // 점수: 타자 한 번에 10점 × 배율, 크리티컬은 보너스.
+    const m = mult();
+    const bonus = hot ? CRIT_BONUS * m : 0;
+    L.score += 10 * m + bonus;
+    setScore(L.score);
+
     if (hot) {
+      L.crits += 1;
       engine.heatTarget = Math.min(1, engine.heatTarget + 0.35);
       engine.trauma = Math.min(1, engine.trauma + 0.5);
+      grove.current?.flare(0.6);
       navigator.vibrate?.(16);
     } else {
       engine.trauma = Math.min(0.6, engine.trauma + 0.015 + heat * 0.075);
     }
+    grove.current?.kick(0.24 + heat * 0.5);
     if (!engine.reduced) {
       const p = caretPoint(ta);
-      if (p) engine.spark(p.x, p.y + p.h * 0.55, hot);
+      if (p) {
+        engine.spark(p.x, p.y + p.h * 0.55, hot);
+        if (hot) engine.say(`+${bonus.toLocaleString("ko-KR")}`, p.x + 14, p.y - 66, CYAN, 26);
+      }
+      // 타건마다 글이 살짝 눌렸다 올라오고, 크리티컬에는 색이 갈라집니다.
+      ta.animate(
+        hot
+          ? [
+              {
+                transform: "scale(1.012)",
+                textShadow: "-4px 0 0 rgb(255 45 85 / .95), 4px 0 0 rgb(64 224 255 / .95)",
+              },
+              { transform: "none", textShadow: "0 0 0 rgb(255 45 85 / 0), 0 0 0 rgb(64 224 255 / 0)" },
+            ]
+          : [{ transform: "translateY(1.5px)" }, { transform: "none" }],
+        { duration: hot ? 240 : 70, easing: "ease-out" },
+      );
     }
     engine.kick();
     sfx.current?.key(L.combo, hot);
@@ -313,7 +434,7 @@ export default function Vent() {
     setBusy(false);
     setStamp({ ...s, id: performance.now() });
     window.clearTimeout(L.stampTimer);
-    L.stampTimer = window.setTimeout(() => setStamp(null), s.quiet ? 1900 : 2700);
+    L.stampTimer = window.setTimeout(() => setStamp(null), s.quiet ? 1900 : 3700);
   }
 
   function wipe() {
@@ -322,6 +443,9 @@ export default function Vent() {
     clearDraft();
     L.peak = 0;
     L.hot = -1;
+    L.score = 0;
+    L.crits = 0;
+    setScore(0);
     endCombo();
   }
 
@@ -337,13 +461,16 @@ export default function Vent() {
     // 연출에 쓸 글자 위치만 떠 두고, 원문은 그 즉시 지웁니다.
     const snap = disguised ? null : snapshot(ta, kind === "vapor" ? 0.28 : 1);
     const n = countChars(value);
-    const peak = live.current.peak;
+    const { peak, score: points, crits } = live.current;
     wipe();
-    const after = bumpTally(n, peak);
+    const after = bumpTally(n, peak, points);
     if (disguised || !snap) return;
 
     const power = clamp(n / FULL, 0.12, 1);
-    const level = VERDICTS.findIndex(([max]) => n < max);
+    let level = 0;
+    RANKS.forEach((r, i) => {
+      if (points >= r.min) level = i;
+    });
     const verb = EFFECTS.find((e) => e.id === kind)?.verb ?? "";
     setStamp(null);
     setBusy(true);
@@ -353,16 +480,21 @@ export default function Vent() {
         showStamp({ quiet: true, main: "증발했습니다", sub: "", foot: "" });
         return;
       }
+      const extras = [peak >= 30 ? `최고 ${peak}콤보` : "", crits ? `크리티컬 ${crits}번` : ""].filter(Boolean);
       showStamp({
         quiet: false,
+        rank: RANKS[level].id,
+        score: points,
+        record: after.record,
         main: `${n.toLocaleString("ko-KR")}자 ${verb}!`,
-        sub: VERDICTS[level][1],
-        foot:
-          peak >= 30
-            ? `오늘 ${after.count}번의 화를 참아냈습니다. 이번 최고 ${peak}콤보.`
-            : `오늘 ${after.count}번의 화를 참아냈습니다.`,
+        sub: RANKS[level].say,
+        foot: `오늘 ${after.count}번의 화를 참아냈습니다.${extras.length ? ` ${extras.join(", ")}.` : ""}`,
       });
-      sfx.current?.chime(level);
+      // 피날레: 랭크 도장, 색종이, 치솟는 대숲.
+      sfx.current?.rank(level);
+      grove.current?.flare();
+      engine.party(0.25 + level * 0.15);
+      if (level >= 3) engine.trauma = Math.min(1, engine.trauma + 0.4);
     });
 
     const audio = sfx.current;
@@ -370,6 +502,7 @@ export default function Vent() {
       if (kind === "shred") audio.shred(duration);
       else if (kind === "burn") audio.burn(duration);
       else if (kind === "hole") audio.hole(duration);
+      else if (kind === "blast") audio.blast(duration, power);
       else audio.vapor();
       if (kind === "shred" || kind === "burn") audio.boom(power);
     }
@@ -439,6 +572,7 @@ export default function Vent() {
         data-full={gauge >= 1 ? "1" : undefined}
         style={{ "--g": gauge } as React.CSSProperties}
       >
+        <canvas ref={groveRef} className="grove" aria-hidden="true" />
         <div className="shell" ref={shellRef}>
           <header className="top">
             <span className="mark">
@@ -511,12 +645,19 @@ export default function Vent() {
             <div className="combo" ref={comboRef} aria-hidden="true">
               <span ref={comboNumRef} />
               <em>콤보</em>
+              <u ref={multRef} />
               <i ref={calloutRef} />
             </div>
 
             {stamp && (
-              <div className={stamp.quiet ? "echo" : "stamp"} key={stamp.id} role="status">
+              <div className={stamp.quiet ? "echo" : "stamp"} key={stamp.id} role="status" data-rank={stamp.rank}>
+                {stamp.rank && <b>{stamp.rank}</b>}
                 <strong>{stamp.main}</strong>
+                {stamp.score !== undefined && (
+                  <p>
+                    <CountUp to={stamp.score} />점{stamp.record && <mark>신기록!</mark>}
+                  </p>
+                )}
                 {stamp.sub && <em>{stamp.sub}</em>}
                 {stamp.foot && <small>{stamp.foot}</small>}
               </div>
@@ -527,7 +668,10 @@ export default function Vent() {
             <div className="rail">
               <div className="fill" />
             </div>
-            <output>{chars > 0 ? `${chars.toLocaleString("ko-KR")}자 장전` : "장전된 글자 없음"}</output>
+            <output>
+              {score > 0 && <b>{score.toLocaleString("ko-KR")}점</b>}
+              {chars > 0 ? `${chars.toLocaleString("ko-KR")}자 장전` : "장전된 글자 없음"}
+            </output>
           </div>
 
           <footer className="dock">
